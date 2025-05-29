@@ -23,24 +23,19 @@
 #include "SDL_keymap_c.h"
 #include "SDL_keyboard_c.h"
 
-struct SDL_Keymap
-{
-    SDL_HashTable *scancode_to_keycode;
-    SDL_HashTable *keycode_to_scancode;
-};
-
 static SDL_Keycode SDL_GetDefaultKeyFromScancode(SDL_Scancode scancode, SDL_Keymod modstate);
 static SDL_Scancode SDL_GetDefaultScancodeFromKey(SDL_Keycode key, SDL_Keymod *modstate);
 
-SDL_Keymap *SDL_CreateKeymap(void)
+SDL_Keymap *SDL_CreateKeymap(bool auto_release)
 {
-    SDL_Keymap *keymap = (SDL_Keymap *)SDL_malloc(sizeof(*keymap));
+    SDL_Keymap *keymap = (SDL_Keymap *)SDL_calloc(1, sizeof(*keymap));
     if (!keymap) {
         return NULL;
     }
 
-    keymap->scancode_to_keycode = SDL_CreateHashTable(NULL, 64, SDL_HashID, SDL_KeyMatchID, NULL, false, false);
-    keymap->keycode_to_scancode = SDL_CreateHashTable(NULL, 64, SDL_HashID, SDL_KeyMatchID, NULL, false, false);
+    keymap->auto_release = auto_release;
+    keymap->scancode_to_keycode = SDL_CreateHashTable(256, false, SDL_HashID, SDL_KeyMatchID, NULL, NULL);
+    keymap->keycode_to_scancode = SDL_CreateHashTable(256, false, SDL_HashID, SDL_KeyMatchID, NULL, NULL);
     if (!keymap->scancode_to_keycode || !keymap->keycode_to_scancode) {
         SDL_DestroyKeymap(keymap);
         return NULL;
@@ -76,31 +71,27 @@ void SDL_SetKeymapEntry(SDL_Keymap *keymap, SDL_Scancode scancode, SDL_Keymod mo
     Uint32 key = ((Uint32)modstate << 16) | scancode;
     const void *value;
     if (SDL_FindInHashTable(keymap->scancode_to_keycode, (void *)(uintptr_t)key, &value)) {
-        SDL_Keycode existing_keycode = (SDL_Keycode)(uintptr_t)value;
+        const SDL_Keycode existing_keycode = (SDL_Keycode)(uintptr_t)value;
         if (existing_keycode == keycode) {
             // We already have this mapping
             return;
         }
-
-        // Changing the mapping, need to remove the existing entry from the keymap
-        SDL_RemoveFromHashTable(keymap->scancode_to_keycode, (void *)(uintptr_t)key);
+        // InsertIntoHashTable will replace the existing entry in the keymap atomically.
     }
-    SDL_InsertIntoHashTable(keymap->scancode_to_keycode, (void *)(uintptr_t)key, (void *)(uintptr_t)keycode);
+    SDL_InsertIntoHashTable(keymap->scancode_to_keycode, (void *)(uintptr_t)key, (void *)(uintptr_t)keycode, true);
 
     bool update_keycode = true;
     if (SDL_FindInHashTable(keymap->keycode_to_scancode, (void *)(uintptr_t)keycode, &value)) {
-        Uint32 existing_value = (Uint32)(uintptr_t)value;
-        SDL_Keymod existing_modstate = (SDL_Keymod)(existing_value >> 16);
+        const Uint32 existing_value = (Uint32)(uintptr_t)value;
+        const SDL_Keymod existing_modstate = (SDL_Keymod)(existing_value >> 16);
 
         // Keep the simplest combination of scancode and modifiers to generate this keycode
         if (existing_modstate <= modstate) {
             update_keycode = false;
-        } else {
-            SDL_RemoveFromHashTable(keymap->keycode_to_scancode, (void *)(uintptr_t)keycode);
         }
     }
     if (update_keycode) {
-        SDL_InsertIntoHashTable(keymap->keycode_to_scancode, (void *)(uintptr_t)keycode, (void *)(uintptr_t)key);
+        SDL_InsertIntoHashTable(keymap->keycode_to_scancode, (void *)(uintptr_t)keycode, (void *)(uintptr_t)key, true);
     }
 }
 
@@ -108,7 +99,7 @@ SDL_Keycode SDL_GetKeymapKeycode(SDL_Keymap *keymap, SDL_Scancode scancode, SDL_
 {
     SDL_Keycode keycode;
 
-    Uint32 key = ((Uint32)NormalizeModifierStateForKeymap(modstate) << 16) | scancode;
+    const Uint32 key = ((Uint32)NormalizeModifierStateForKeymap(modstate) << 16) | scancode;
     const void *value;
     if (keymap && SDL_FindInHashTable(keymap->scancode_to_keycode, (void *)(uintptr_t)key, &value)) {
         keycode = (SDL_Keycode)(uintptr_t)value;
@@ -777,7 +768,7 @@ static const char *SDL_scancode_names[SDL_SCANCODE_COUNT] =
     /* 97 */ "Keypad 9",
     /* 98 */ "Keypad 0",
     /* 99 */ "Keypad .",
-    /* 100 */ NULL,
+    /* 100 */ "NonUSBackslash",
     /* 101 */ "Application",
     /* 102 */ "Power",
     /* 103 */ "Keypad =",
@@ -812,24 +803,24 @@ static const char *SDL_scancode_names[SDL_SCANCODE_COUNT] =
     /* 132 */ NULL,
     /* 133 */ "Keypad ,",
     /* 134 */ "Keypad = (AS400)",
-    /* 135 */ NULL,
-    /* 136 */ NULL,
-    /* 137 */ NULL,
-    /* 138 */ NULL,
-    /* 139 */ NULL,
-    /* 140 */ NULL,
-    /* 141 */ NULL,
-    /* 142 */ NULL,
-    /* 143 */ NULL,
-    /* 144 */ NULL,
-    /* 145 */ NULL,
-    /* 146 */ NULL,
-    /* 147 */ NULL,
-    /* 148 */ NULL,
-    /* 149 */ NULL,
-    /* 150 */ NULL,
-    /* 151 */ NULL,
-    /* 152 */ NULL,
+    /* 135 */ "International 1",
+    /* 136 */ "International 2",
+    /* 137 */ "International 3",
+    /* 138 */ "International 4",
+    /* 139 */ "International 5",
+    /* 140 */ "International 6",
+    /* 141 */ "International 7",
+    /* 142 */ "International 8",
+    /* 143 */ "International 9",
+    /* 144 */ "Language 1",
+    /* 145 */ "Language 2",
+    /* 146 */ "Language 3",
+    /* 147 */ "Language 4",
+    /* 148 */ "Language 5",
+    /* 149 */ "Language 6",
+    /* 150 */ "Language 7",
+    /* 151 */ "Language 8",
+    /* 152 */ "Language 9",
     /* 153 */ "AltErase",
     /* 154 */ "SysReq",
     /* 155 */ "Cancel",
@@ -1068,7 +1059,7 @@ const char *SDL_GetKeyName(SDL_Keycode key)
             // but the key name is defined as the letter printed on that key,
             // which is usually the shifted capital letter.
             if (key > 0x7F || (key >= 'a' && key <= 'z')) {
-                SDL_Keymap *keymap = SDL_GetCurrentKeymap();
+                SDL_Keymap *keymap = SDL_GetCurrentKeymap(false);
                 SDL_Keymod modstate;
                 SDL_Scancode scancode = SDL_GetKeymapScancode(keymap, key, &modstate);
                 if (scancode != SDL_SCANCODE_UNKNOWN && !(modstate & SDL_KMOD_SHIFT)) {
@@ -1136,7 +1127,7 @@ SDL_Keycode SDL_GetKeyFromName(const char *name)
             // SDL_Keycode is defined as the unshifted key on the keyboard,
             // but the key name is defined as the letter printed on that key,
             // which is usually the shifted capital letter.
-            SDL_Keymap *keymap = SDL_GetCurrentKeymap();
+            SDL_Keymap *keymap = SDL_GetCurrentKeymap(false);
             SDL_Keymod modstate;
             SDL_Scancode scancode = SDL_GetKeymapScancode(keymap, key, &modstate);
             if (scancode != SDL_SCANCODE_UNKNOWN && (modstate & (SDL_KMOD_SHIFT | SDL_KMOD_CAPS))) {

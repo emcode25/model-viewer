@@ -383,7 +383,7 @@ void X11_UpdateKeymap(SDL_VideoDevice *_this, bool send_event)
 
     SDL_VideoData *data = _this->internal;
     SDL_Scancode scancode;
-    SDL_Keymap *keymap = SDL_CreateKeymap();
+    SDL_Keymap *keymap = SDL_CreateKeymap(true);
 
 #ifdef SDL_VIDEO_DRIVER_X11_HAS_XKBLOOKUPKEYSYM
     if (data->xkb.desc_ptr) {
@@ -660,7 +660,8 @@ void X11_CreateInputContext(SDL_WindowData *data)
                                          NULL);
                 X11_XFree(attr);
             }
-        } else {
+        }
+        if (!data->ic) {
             data->ic = X11_XCreateIC(videodata->im,
                                      XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
                                      XNClientWindow, data->xwindow,

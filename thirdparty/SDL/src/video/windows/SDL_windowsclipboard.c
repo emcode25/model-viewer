@@ -145,7 +145,7 @@ static void *WIN_ConvertDIBtoBMP(HANDLE hMem, size_t *size)
                     pbfh->bfSize = (DWORD)bmp_size;
                     pbfh->bfReserved1 = 0;
                     pbfh->bfReserved2 = 0;
-                    pbfh->bfOffBits = (DWORD)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + color_table_size);
+                    pbfh->bfOffBits = (DWORD)(sizeof(BITMAPFILEHEADER) + pbih->biSize + color_table_size);
                     SDL_memcpy((Uint8 *)bmp + sizeof(BITMAPFILEHEADER), dib, dib_size);
                     *size = bmp_size;
                 }
@@ -193,7 +193,7 @@ static bool WIN_SetClipboardText(SDL_VideoDevice *_this, const char *mime_type)
     clipboard_data = _this->clipboard_callback(_this->clipboard_userdata, mime_type, &clipboard_data_size);
     if (clipboard_data && clipboard_data_size > 0) {
         SIZE_T i, size;
-        LPTSTR tstr = (WCHAR *)SDL_iconv_string("UTF-16LE", "UTF-8", (const char *)clipboard_data, clipboard_data_size);
+        LPWSTR tstr = (WCHAR *)SDL_iconv_string("UTF-16LE", "UTF-8", (const char *)clipboard_data, clipboard_data_size);
         if (!tstr) {
             return SDL_SetError("Couldn't convert text from UTF-8");
         }
@@ -210,7 +210,7 @@ static bool WIN_SetClipboardText(SDL_VideoDevice *_this, const char *mime_type)
         // Save the data to the clipboard
         hMem = GlobalAlloc(GMEM_MOVEABLE, size);
         if (hMem) {
-            LPTSTR dst = (LPTSTR)GlobalLock(hMem);
+            LPWSTR dst = (LPWSTR)GlobalLock(hMem);
             if (dst) {
                 // Copy the text over, adding carriage returns as necessary
                 for (i = 0; tstr[i]; ++i) {

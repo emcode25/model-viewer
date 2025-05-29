@@ -9,7 +9,7 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("model-viewer")
+project (model-viewer)
 
 # -----SDL----
 # set the output directory for built objects.
@@ -18,18 +18,26 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 
 add_subdirectory(thirdparty/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/SDL_image EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/assimp EXCLUDE_FROM_ALL)
 
 # -----END SDL-----
 
 # Add source to this project's executable.
 file(GLOB SRC_FILES CONFIGURE_DEPENDS "src/*/*.cpp" "src/*/*.c" "src/*.c" "src/*.cpp" "thirdparty/glad/src/glad.c" "thirdparty/imgui/*.cpp")
-add_executable (model-viewer ${SRC_FILES})
+add_executable (model-viewer ${SRC_FILES} "src/model.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET model-viewer PROPERTY CXX_STANDARD 20)
 endif()
 
 # Link to the actual SDL3 library.
-target_link_libraries(model-viewer PRIVATE SDL3::SDL3)
+target_link_libraries(model-viewer PRIVATE SDL3::SDL3 SDL3_image::SDL3_image assimp::assimp)
 
-target_include_directories(model-viewer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui)
+target_include_directories(model-viewer PUBLIC 
+	${CMAKE_CURRENT_SOURCE_DIR}/include 
+	${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include 
+	${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui
+	${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/include
+	${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/assimp/include
+)

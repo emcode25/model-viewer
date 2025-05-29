@@ -72,17 +72,21 @@ static SDL_Cursor *WIN_CreateCursorAndData(HCURSOR hcursor)
     }
 
     SDL_Cursor *cursor = (SDL_Cursor *)SDL_calloc(1, sizeof(*cursor));
-    if (cursor) {
-        SDL_CursorData *data = (SDL_CursorData *)SDL_calloc(1, sizeof(*data));
-        if (!data) {
-            SDL_free(cursor);
-            return NULL;
-        }
-        data->cursor = hcursor;
-        cursor->internal = data;
+    if (!cursor) {
+        return NULL;
     }
+
+    SDL_CursorData *data = (SDL_CursorData *)SDL_calloc(1, sizeof(*data));
+    if (!data) {
+        SDL_free(cursor);
+        return NULL;
+    }
+
+    data->cursor = hcursor;
+    cursor->internal = data;
     return cursor;
 }
+
 
 static bool IsMonochromeSurface(SDL_Surface *surface)
 {
@@ -129,6 +133,9 @@ static HBITMAP CreateColorBitmap(SDL_Surface *surface)
     bitmap = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, &pixels, NULL, 0);
     if (!bitmap || !pixels) {
         WIN_SetError("CreateDIBSection()");
+        if (bitmap) {
+            DeleteObject(bitmap);
+        }
         return NULL;
     }
 
@@ -158,6 +165,7 @@ static HBITMAP CreateMaskBitmap(SDL_Surface *surface, bool is_monochrome)
 
     pixels = SDL_small_alloc(Uint8, size * (is_monochrome ? 2 : 1), &isstack);
     if (!pixels) {
+        SDL_OutOfMemory();
         return NULL;
     }
 
@@ -197,33 +205,34 @@ static HBITMAP CreateMaskBitmap(SDL_Surface *surface, bool is_monochrome)
 
 static HCURSOR WIN_CreateHCursor(SDL_Surface *surface, int hot_x, int hot_y)
 {
-    HCURSOR hcursor;
-    ICONINFO ii;
+    HCURSOR hcursor = NULL;
     bool is_monochrome = IsMonochromeSurface(surface);
-
-    SDL_zero(ii);
-    ii.fIcon = FALSE;
-    ii.xHotspot = (DWORD)hot_x;
-    ii.yHotspot = (DWORD)hot_y;
-    ii.hbmMask = CreateMaskBitmap(surface, is_monochrome);
-    ii.hbmColor = is_monochrome ? NULL : CreateColorBitmap(surface);
+    ICONINFO ii = { 
+        .fIcon = FALSE, 
+        .xHotspot = (DWORD)hot_x, 
+        .yHotspot = (DWORD)hot_y,
+        .hbmMask = CreateMaskBitmap(surface, is_monochrome),
+        .hbmColor = is_monochrome ? NULL : CreateColorBitmap(surface) 
+    };
 
     if (!ii.hbmMask || (!is_monochrome && !ii.hbmColor)) {
         SDL_SetError("Couldn't create cursor bitmaps");
-        return NULL;
+        goto cleanup;
     }
 
     hcursor = CreateIconIndirect(&ii);
+    if (!hcursor) {
+        WIN_SetError("CreateIconIndirect failed");
+    }
 
-    DeleteObject(ii.hbmMask);
+cleanup:
+    if (ii.hbmMask) {
+        DeleteObject(ii.hbmMask);
+    }
     if (ii.hbmColor) {
         DeleteObject(ii.hbmColor);
     }
 
-    if (!hcursor) {
-        WIN_SetError("CreateIconIndirect()");
-        return NULL;
-    }
     return hcursor;
 }
 
@@ -286,7 +295,7 @@ static SDL_Cursor *WIN_CreateSystemCursor(SDL_SystemCursor id)
         name = IDC_CROSS;
         break;
     case SDL_SYSTEM_CURSOR_PROGRESS:
-        name = IDC_WAIT;
+        name = IDC_APPSTARTING;
         break;
     case SDL_SYSTEM_CURSOR_NWSE_RESIZE:
         name = IDC_SIZENWSE;
@@ -353,7 +362,9 @@ static void WIN_FreeCursor(SDL_Cursor *cursor)
     while (data->cache) {
         CachedCursor *entry = data->cache;
         data->cache = entry->next;
-        DestroyCursor(entry->cursor);
+        if (entry->cursor) {
+            DestroyCursor(entry->cursor);
+        }
         SDL_free(entry);
     }
     if (data->cursor) {

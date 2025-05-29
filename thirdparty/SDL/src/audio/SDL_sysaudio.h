@@ -264,6 +264,13 @@ struct SDL_LogicalAudioDevice
     // true if device was opened with SDL_OpenAudioDeviceStream (so it forbids binding changes, etc).
     bool simplified;
 
+    // If non-NULL, callback into the app that alerts it to start/end of device iteration.
+    SDL_AudioIterationCallback iteration_start;
+    SDL_AudioIterationCallback iteration_end;
+
+    // App-supplied pointer for iteration callbacks.
+    void *iteration_userdata;
+
     // If non-NULL, callback into the app that lets them access the final postmix buffer.
     SDL_AudioPostmixCallback postmix;
 
@@ -360,6 +367,7 @@ typedef struct AudioBootStrap
     const char *desc;
     bool (*init)(SDL_AudioDriverImpl *impl);
     bool demand_only; // if true: request explicitly, or it won't be available.
+    bool is_preferred;
 } AudioBootStrap;
 
 // Not all of these are available in a given build. Use #ifdefs, etc.
