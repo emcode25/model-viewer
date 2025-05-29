@@ -79,6 +79,7 @@ GLuint textureFromFile(const char* path, const std::string& directory, bool gamm
 
 GLuint compileShaderProgram(const char* vertexFilename, const char* fragmentFilename)
 {
+	//Read shader source code
 	const char* vertSource, *fragSource;
 	std::string vertStr, fragStr;
 	vertStr = readFileToString(vertexFilename);
@@ -87,23 +88,50 @@ GLuint compileShaderProgram(const char* vertexFilename, const char* fragmentFile
 	vertSource = vertStr.c_str();
 	fragSource = fragStr.c_str();
 
+	
+	//Create shaders in OpenGL
 	GLuint vertShader, fragShader;
 	vertShader = glCreateShader(GL_VERTEX_SHADER);
 	fragShader = glCreateShader(GL_FRAGMENT_SHADER);
 
+
+	//Compile vertex shader
 	glShaderSource(vertShader, 1, &vertSource, NULL);
 	glCompileShader(vertShader);
-	checkCompileErrors(vertShader, "VERTEX");
 
+	if(checkCompileErrors(vertShader, "VERTEX") != 0)
+	{
+		glDeleteShader(vertShader);
+		return 0;
+	}
+
+
+	//Compile fragment shader
 	glShaderSource(fragShader, 1, &fragSource, NULL);
 	glCompileShader(fragShader);
-	checkCompileErrors(fragShader, "FRAGMENT");
 
+	if(checkCompileErrors(fragShader, "FRAGMENT") != 0)
+	{
+		glDeleteShader(vertShader);
+		glDeleteShader(fragShader);
+		return 0;
+	}
+
+
+	//Create program
 	GLuint program = glCreateProgram();
 	glAttachShader(program, vertShader);
 	glAttachShader(program, fragShader);
 	glLinkProgram(program);
-	checkCompileErrors(program, "PROGRAM");
+
+	if(checkCompileErrors(program, "PROGRAM") != 0)
+	{
+		glDeleteShader(vertShader);
+		glDeleteShader(fragShader);
+		glDeleteProgram(program);
+		return 0;
+	}
+
 
 	glDeleteShader(vertShader);
 	glDeleteShader(fragShader);
@@ -134,8 +162,9 @@ void _CheckGLError(const char* file, int line)
 	return;
 }
 
-void checkCompileErrors(GLuint shader, std::string type)
+int checkCompileErrors(GLuint shader, std::string type)
 {
+	int ret = 0;
 	GLint success;
 	GLchar infoLog[1024];
 	if(type != "PROGRAM")
@@ -145,6 +174,7 @@ void checkCompileErrors(GLuint shader, std::string type)
 		{
 			glGetShaderInfoLog(shader, 1024, NULL, infoLog);
 			std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+			ret = -1;
 		}
 	}
 	else
@@ -154,6 +184,9 @@ void checkCompileErrors(GLuint shader, std::string type)
 		{
 			glGetProgramInfoLog(shader, 1024, NULL, infoLog);
 			std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+			ret = -2;
 		}
 	}
+
+	return ret;
 }

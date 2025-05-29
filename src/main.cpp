@@ -15,7 +15,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/quaternion.hpp>
 
 #include "util.hpp"
@@ -135,8 +134,19 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 
 	if(recompileShaders)
 	{
-		glDeleteProgram(program);
-		program = compileShaderProgram("../../../../src/shaders/vertex.glsl", "../../../../src/shaders/fragment.glsl");
+		SDL_LogInfo(SDL_LOG_CATEGORY_GPU, "[OPENGL] Recompiling shaders...");
+		GLuint newProgram = compileShaderProgram("../../../../src/shaders/vertex.glsl", "../../../../src/shaders/fragment.glsl");
+
+		if(newProgram != 0)
+		{
+			glDeleteProgram(program);
+			program = newProgram;
+			SDL_LogInfo(SDL_LOG_CATEGORY_GPU, "[OPENGL] Successfully recompiled shaders.");
+		}
+		else
+		{
+			SDL_LogInfo(SDL_LOG_CATEGORY_GPU, "[OPENGL] Shader recompilation failed.");
+		}
 	}
 
 	if(resetLight)
